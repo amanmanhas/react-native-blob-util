@@ -9,6 +9,9 @@ import android.os.Environment;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.util.Base64;
+import android.content.ContentResolver;
+import android.provider.MediaStore;
+import android.content.ContentValues;
 
 import com.ReactNativeBlobUtil.Utils.PathResolver;
 import com.facebook.react.bridge.Arguments;
@@ -27,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
 
 class ReactNativeBlobUtilFS {
 
@@ -253,7 +257,7 @@ class ReactNativeBlobUtilFS {
         res.put("DCIMDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_DCIM));
         res.put("PictureDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_PICTURES));
         res.put("MusicDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_MUSIC));
-        res.put("DownloadDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_DOWNLOADS));
+        res.put("DownloadDir", getExternalFilesDownloadDirPath(ctx));
         res.put("MovieDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_MOVIES));
         res.put("RingtoneDir", getExternalFilesDirPath(ctx, Environment.DIRECTORY_RINGTONES));
 
@@ -278,6 +282,23 @@ class ReactNativeBlobUtilFS {
         File dir = ctx.getExternalFilesDir(type);
         if (dir != null) return dir.getAbsolutePath();
         return "";
+    }
+
+    /**
+     * Extracting public downloads directory path according to the OS version to support old and new OS
+     * @param ctx
+     * @return
+     */
+    static String getExternalFilesDownloadDirPath(ReactApplicationContext ctx) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "*/*");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+            Uri dirPath = ctx.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            return new File(FileUtils.getRealPath(ctx, dirPath)).getAbsolutePath();
+        }else {
+            return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString();
+        }
     }
 
     static String getFilesDirPath(ReactApplicationContext ctx) {
@@ -1185,6 +1206,9 @@ class ReactNativeBlobUtilFS {
             return null;
         if (!path.matches("\\w+\\:.*"))
             return path;
+        if (path.startsWith("file://")) {
+            return path.replace("file://", "");
+        }
 
         Uri uri = Uri.parse(path);
         if (path.startsWith(ReactNativeBlobUtilConst.FILE_PREFIX_BUNDLE_ASSET)) {
